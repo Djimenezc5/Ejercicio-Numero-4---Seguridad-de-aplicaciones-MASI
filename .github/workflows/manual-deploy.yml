@@ -62,16 +62,14 @@ jobs:
         with:
           name: build-deploy
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v3
-
-      - name: Upload artifact for GitHub Pages
-        uses: actions/upload-pages-artifact@v1
+      - name: Publicar en gh-pages usando peaceiris
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          path: ./deploy
-
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v1
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./deploy
+          publish_branch: gh-pages
+          force_orphan: true
+          commit_message: "manual deploy: publicar sitio desde workflow"
 
       - name: Summary
-        run: echo "Build publicado en GitHub Pages (entorno: pruebas). Revisa la sección Pages del repo."
+        run: echo "Build publicado en GitHub Pages (entorno: pruebas). Revisa la rama gh-pages y la sección Pages del repo."

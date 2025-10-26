@@ -125,20 +125,18 @@ jobs:
             cp -R index.html css js deploy_for_pages/ || true
           fi
 
-      - name: Configure Pages
-        uses: actions/configure-pages@v3
-
-      - name: Upload artifact for GitHub Pages
-        uses: actions/upload-pages-artifact@v1
+      - name: Publicar en gh-pages usando peaceiris
+        uses: peaceiris/actions-gh-pages@v3
         with:
-          path: ./deploy_for_pages
-
-      - name: Deploy to GitHub Pages
-        uses: actions/deploy-pages@v1
-        # Nota: este despliegue publica a GitHub Pages; para otros entornos (FTP, SSH, Azure) reemplaza este paso.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./deploy_for_pages
+          publish_branch: gh-pages
+          # force push para reemplazar el contenido
+          force_orphan: true
+          commit_message: "ci: publicar sitio desde workflow"
 
       - name: Deployment summary
-        run: echo "Despliegue al entorno 'pruebas' completado. Revisa la página de Environments en GitHub para ver el estado."
+        run: echo "Despliegue al entorno 'pruebas' completado (publicado en gh-pages). Revisa la rama gh-pages y la sección Pages del repo."
 
 # Costes y notas:
 # - GitHub-hosted runners: gratuitos para repos públicos; privados consumen minutos de tu plan.

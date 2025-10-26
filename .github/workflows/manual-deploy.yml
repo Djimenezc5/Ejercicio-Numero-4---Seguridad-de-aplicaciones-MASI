@@ -1,0 +1,77 @@
+name: 'Manual Build & Publish to GitHub Pages'
+
+# Workflow manual para construir y publicar en GitHub Pages
+# Uso: desde la pestaña Actions -> Manual Build & Publish -> Run workflow
+# Proporciona una forma de ejecutar solo el build y publicar manualmente sin pasar por PRs.
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publicar en GitHub Pages después del build? (yes/no)'
+        required: true
+        default: 'yes'
+
+env:
+  NODE_VERSION: '18'
+  ARTIFACT_NAME: 'webapp-artifact'
+
+jobs:
+  build:
+    name: Build (manual)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run build (if exists) or prepare static files
+        run: |
+          set -e
+          rm -rf deploy
+          mkdir -p deploy
+          if npm run build --silent; then
+            echo 'Usando carpeta build/ generada por npm run build'
+            cp -R build/* deploy/ || true
+          else
+            echo 'No hay script build o falló; empaquetando archivos estáticos mínimos'
+            cp -R index.html css js README.md deploy/ || true
+          fi
+
+      - name: Archive artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-deploy
+          path: deploy
+
+  publish:
+    name: Publicar en GitHub Pages (manual)
+    runs-on: ubuntu-latest
+    needs: build
+    if: ${{ github.event.inputs.publish == 'yes' }}
+    steps:
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-deploy
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v3
+
+      - name: Upload artifact for GitHub Pages
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: ./deploy
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v1
+
+      - name: Summary
+        run: echo "Build publicado en GitHub Pages (entorno: pruebas). Revisa la sección Pages del repo."

@@ -68,6 +68,107 @@ Luego ajusta las referencias en `index.html` a los archivos locales (por ejemplo
 - Añadir tests automatizados (jest/puppeteer) para flujos de login.
 - Añadir pipeline de CI para desplegar en un entorno de staging.
 
+## Publicar manualmente desde GitHub
+
+Se incluyó un workflow manual para construir y publicar en GitHub Pages:
+
+- Archivo: `.github/workflows/manual-deploy.yml`
+- Uso: en GitHub, ve a la pestaña Actions -> "Manual Build & Publish to GitHub Pages" -> Run workflow.
+- El workflow hace `npm ci`, intenta ejecutar `npm run build` si existe, y empaqueta archivos estáticos.
+- Si eliges publicar, el workflow sube y despliega el contenido a GitHub Pages.
+
+Notas de seguridad:
+- Asegúrate de no tener secretos en el repositorio antes de publicar.
+- Para despliegues privados o a otros destinos (Azure, S3, FTP) añade los secrets en GitHub (Settings -> Secrets).
+
+### Generar el build localmente
+
+1. En tu máquina local (PowerShell), sitúate en la carpeta del proyecto:
+
+```powershell
+cd 'c:\Users\Hades\Desktop\Actividad Número 4'
+```
+
+2. Instala dependencias si no lo has hecho aún:
+
+```powershell
+npm install
+```
+
+3. Genera el build con el script incluido:
+
+```powershell
+npm run build
+```
+
+Esto creará la carpeta `build/` con los archivos listos para publicar (index.html, css/, js/, README.md).
+
+### Opciones para publicar manualmente en GitHub Pages
+
+Opción A — Publicar empujando `build/` a la rama `gh-pages` (manual, sin herramientas extra):
+
+1. Asegúrate de tener los últimos cambios en `main`:
+
+```powershell
+git checkout main
+git pull origin main
+```
+
+2. Genera el build localmente: `npm run build`.
+
+3. Crear y empujar la rama `gh-pages` con el contenido de `build/`:
+
+```powershell
+# Crea (o cambia a) la rama gh-pages
+git checkout --orphan gh-pages
+
+# Elimina todos los archivos del índice
+git rm -rf --cached .
+
+# Copia los archivos del build al root del repo (PowerShell)
+Copy-Item -Path .\build\* -Destination . -Recurse -Force
+
+git add .
+git commit -m "Publicar sitio - build"
+git push -u origin gh-pages --force
+```
+
+4. En GitHub -> Settings -> Pages configura la fuente a `gh-pages` branch y la carpeta `/ (root)`.
+
+Opción B — Usar el paquete `gh-pages` (recomendado, automatiza la publicación):
+
+1. Instala `gh-pages` localmente (una sola vez):
+
+```powershell
+npm install --save-dev gh-pages
+```
+
+2. Añade un script en `package.json` bajo `scripts` (opcional):
+
+```json
+"deploy": "gh-pages -d build"
+```
+
+3. Ejecuta:
+
+```powershell
+npm run build
+npm run deploy
+```
+
+Esto publicará el contenido de `build/` en la rama `gh-pages` automáticamente.
+
+Opción C — Usar el workflow manual en GitHub (si prefieres ejecutar en Actions pero generar build localmente)
+
+1. Genera `build/` localmente: `npm run build`.
+2. Añade y commitea `build/` en una rama (por ejemplo `deploy-build`) y púshala al repo.
+3. Ejecuta el workflow `Manual Build & Publish to GitHub Pages` desde la pestaña Actions en GitHub y configura el workflow para usar los artefactos subidos si es necesario.
+
+Notas finales
+
+- Después de publicar, la URL de GitHub Pages estará en la página Settings -> Pages del repositorio.
+- Para repos privados la publicación en GitHub Pages puede requerir configuración adicional (org settings). Si quieres, puedo añadir un script `deploy` que use `gh-pages` y actualizar `package.json` para hacerlo aún más sencillo.
+
 ---
 
 Comentarios en español incluidos en los archivos fuente para facilitar la lectura y personalización.

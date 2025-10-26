@@ -4,7 +4,8 @@
   "description": "Demo: login y panel con Bootstrap - ambiente de pruebas",
   "scripts": {
     "start": "npx http-server . -p 8090",
-    "test": "jest --coverage"
+    "test": "jest --coverage",
+    "build": "node scripts/build.js"
   },
   "dependencies": {
     "bootstrap": "^5.3.2",

@@ -169,6 +169,73 @@ Notas finales
 - Después de publicar, la URL de GitHub Pages estará en la página Settings -> Pages del repositorio.
 - Para repos privados la publicación en GitHub Pages puede requerir configuración adicional (org settings). Si quieres, puedo añadir un script `deploy` que use `gh-pages` y actualizar `package.json` para hacerlo aún más sencillo.
 
+## Guía: Pipeline automatizado CI/CD en GitHub (Tests · Audit · Build · Deploy)
+
+Esta guía explica cómo funciona el pipeline automatizado que ya está incluido en este repositorio mediante GitHub Actions, qué necesita configurarse en GitHub y cómo validar el despliegue en el entorno de pruebas.
+
+Resumen de la pipeline incluida
+- Archivo workflow: `.github/workflows/ci.yml`
+- Jobs (orden):
+  1. `test-and-audit`: instala dependencias, ejecuta `npm test` y `npm audit` (genera `audit.json`). Si se detectan vulnerabilidades HIGH/CRITICAL la job falla.
+  2. `build`: ejecuta `npm run build` (si existe) o empaqueta archivos estáticos en `deploy/`, crea un ZIP y lo sube como artifact.
+  3. `deploy`: despliega el contenido al environment `pruebas` usando GitHub Pages actions (puede ajustarse a otros destinos).
+
+Requisitos previos (antes de activar la pipeline)
+1. Tener el repo en GitHub (preferible rama `main`).
+2. Revisar `package.json` y confirmar que existe el script `build`. Este repo incluye un script `build` mínimo que copia archivos a `build/`:
+
+```json
+"scripts": {
+  "build": "node scripts/build.js",
+  "test": "jest --coverage",
+  "start": "npx http-server . -p 8090"
+}
+```
+
+3. Si vas a desplegar a GitHub Pages:
+  - En el repositorio ve a Settings → Pages y configura la fuente si quieres usar `gh-pages` o ramas específicas. El workflow usa las actions oficiales para publicar.
+
+4. Crear el Environment `pruebas` en GitHub (opcional pero recomendado):
+  - Ve a Settings → Environments → New environment → nombre `pruebas`.
+  - Si quieres aprobación manual antes de deploy, añade reviewers en la protección del environment. El job `deploy` en el workflow declara `environment: pruebas`, por lo que respetará estas protecciones.
+
+5. (Opcional) Secrets y permisos:
+  - Para despliegues a otros destinos (Azure App Service, S3, FTP, Netlify) crea secrets en Settings → Secrets and variables → Actions (ej: `AZURE_WEBAPP_PUBLISH_PROFILE`, `NETLIFY_AUTH_TOKEN`, `FTP_PASSWORD`).
+  - Si el destino no es GitHub Pages, modifica el job `deploy` para usar la acción correspondiente e inyectar los secrets.
+
+Cómo funciona el flujo (ejecución automática)
+1. Cada push a `main` o cada Pull Request hacia `main` ejecuta el workflow (`on: push, pull_request`).
+2. `test-and-audit` corre primero. Si falla (tests o vulnerabilities HIGH/CRITICAL) la pipeline se detiene y no pasa al build.
+3. Si `test-and-audit` pasa, `build` empaqueta el sitio y sube el artifact.
+4. `deploy` toma el artifact y publica al environment `pruebas` (actualmente usa GitHub Pages). Si el environment tiene protección con reviewers, GitHub solicitará aprobación manual antes de ejecutar el deploy.
+
+Cómo validar todo paso a paso
+1. Habilita Actions en el repo si está deshabilitado. Asegúrate de que GitHub Actions tenga permisos para ejecutar workflows.
+2. Crea o actualiza la rama `main` con los cambios y pushea:
+
+```powershell
+git checkout main
+git add .
+git commit -m "Trigger CI: pruebas, audit, build, deploy"
+git push origin main
+```
+
+3. Ver logs: Ve a la pestaña Actions → selecciona el workflow `GitHub CI/CD - Tests · Audit · Build · Deploy` → revisa la ejecución y los logs por job.
+4. Artefactos: en la página de ejecución puedes encontrar los artefactos (audit-report y webapp-artifact) y descargarlos para inspección.
+5. Deployment: si el deploy se completó, revisa la página de GitHub Pages (Settings → Pages) para la URL o la sección Environments → `pruebas` para ver el estado y aprobaciones.
+
+Recomendaciones prácticas y seguridad
+- No almacenes secrets o credenciales en el repo. Usa GitHub Secrets.
+- Si la ejecución en PRs es costosa, considera limitar audit o E2E a `push` en `main` y dejar tests unitarios en PRs.
+- Si vas a ejecutar muchas builds, usa runners self-hosted para reducir coste en minutos del plan.
+
+Modificar el destino de despliegue (ejemplos rápidos)
+- Azure App Service: usa `azure/webapps-deploy@v2` y el secret `AZURE_WEBAPP_PUBLISH_PROFILE`.
+- Netlify: usa `netlify/actions/cli` o `netlify/actions/deploy` y el secret `NETLIFY_AUTH_TOKEN`.
+- S3: usa `jakejarvis/s3-sync-action` y secrets `AWS_ACCESS_KEY_ID` y `AWS_SECRET_ACCESS_KEY`.
+
+¿Quieres que adapte el job `deploy` a uno de esos destinos (p. ej. Azure App Service)? Si me indicas el destino y si ya tienes los secrets, lo implemento y pruebas.
+
 ---
 
 Comentarios en español incluidos en los archivos fuente para facilitar la lectura y personalización.

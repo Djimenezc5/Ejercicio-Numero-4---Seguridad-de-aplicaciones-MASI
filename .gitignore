@@ -1,0 +1,12 @@
+# Dependencias node
+node_modules/
+
+# Entorno local
+.env
+
+# Editor
+.vscode/
+.DS_Store
+
+# Logs
+npm-debug.log*

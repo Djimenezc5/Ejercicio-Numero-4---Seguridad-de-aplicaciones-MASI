@@ -1,0 +1,22 @@
+{
+  "name": "demo-login-bootstrap",
+  "version": "0.1.0",
+  "description": "Demo: login y panel con Bootstrap - ambiente de pruebas",
+  "scripts": {
+    "start": "npx http-server . -p 8090",
+    "test": "jest --coverage"
+  },
+  "dependencies": {
+    "bootstrap": "^5.3.2",
+    "bootstrap-icons": "^1.10.5"
+  },
+  "devDependencies": {
+    "jest": "^29.6.1",
+    "jest-environment-jsdom": "^29.6.1"
+  },
+  "jest": {
+    "testEnvironment": "jest-environment-jsdom"
+  },
+  "author": "Daniel Jiménez",
+  "license": "MIT"
+}

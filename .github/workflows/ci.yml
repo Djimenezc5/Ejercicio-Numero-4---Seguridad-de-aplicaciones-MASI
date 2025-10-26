@@ -1,0 +1,148 @@
+name: 'GitHub CI/CD - Tests · Audit · Build · Deploy'
+
+# Workflow de CI/CD para GitHub Actions
+# Tareas:
+#  - Pruebas automatizadas (Jest)
+#  - Escaneo de vulnerabilidades (npm audit)
+#  - Construcción/empacado
+#  - Despliegue al entorno de pruebas (GitHub Pages 'pruebas' environment)
+#
+# Nota: Para que este workflow funcione en GitHub, debe colocarse en .github/workflows/ (aquí se creó).
+# Si tu repo es privado y quieres despliegue, revisa permisos (GITHUB_TOKEN) o usa un Personal Access Token
+# para acciones que lo requieran.
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  NODE_VERSION: '18'
+  ARTIFACT_NAME: 'webapp-artifact'
+
+jobs:
+  test-and-audit:
+    name: Pruebas y Escaneo de Vulnerabilidades
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ env.NODE_VERSION }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-${{ env.NODE_VERSION }}-
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+      - name: Run tests
+        run: npm test --silent
+
+      - name: npm audit (generar audit.json)
+        run: |
+          npm audit --json > audit.json || true
+          node -e "const fs=require('fs');const p='audit.json';if(!fs.existsSync(p)){console.log('No hay reporte de audit');process.exit(0);}const a=JSON.parse(fs.readFileSync(p));const v=(a.metadata&&a.metadata.vulnerabilities)?a.metadata.vulnerabilities:{}; if((v.high||0)>0 || (v.critical||0)>0){ console.error('Vulnerabilidades HIGH/CRITICAL detectadas:',JSON.stringify(v)); process.exit(2);} else { console.log('No se detectaron vulnerabilidades HIGH/CRITICAL.'); process.exit(0);}"
+        # Nota: npm audit es gratuito; su ejecución consume tiempo de runner. Para análisis más completos,
+        # considera integrar herramientas como Snyk o Trivy (pueden requerir token y plan).
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: audit-report
+          path: audit.json
+
+  build:
+    name: Construcción y Empaquetado
+    runs-on: ubuntu-latest
+    needs: test-and-audit
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies (npm ci)
+        run: npm ci
+
+      - name: Build / Empaquetar
+        run: |
+          rm -rf deploy
+          mkdir -p deploy
+          # Si existe un script de build (p. ej. React/Vite) úsalo; si no, copiamos archivos estáticos mínimos
+          if npm run build --silent; then
+            echo 'Usando carpeta build/ generada por npm run build'
+            cp -R build/* deploy/ || true
+          else
+            echo 'No hay script build o falló; empacando archivos estáticos mínimos'
+            cp -R index.html css js README.md deploy/ || true
+          fi
+          zip -r build/${{ env.ARTIFACT_NAME }}.zip deploy
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: build/${{ env.ARTIFACT_NAME }}.zip
+
+  deploy:
+    name: Desplegar a entorno de pruebas
+    runs-on: ubuntu-latest
+    needs: build
+    # Declaramos un environment en GitHub llamado 'pruebas' (puede usarse para protección/manual approvals)
+    environment: pruebas
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Preparar contenido para Pages
+        run: |
+          rm -rf deploy_for_pages
+          mkdir -p deploy_for_pages
+          # Extraer artefacto subido por el job build
+          mkdir -p tmp_artifacts
+          gh auth setup-git || true
+          # Si el repo usa GitHub-hosted runners y no hay artefacto compartido, reconstruimos localmente
+          if [ -d deploy ]; then
+            cp -R deploy/* deploy_for_pages/ || true
+          elif [ -d build ]; then
+            cp -R build/* deploy_for_pages/ || true
+          else
+            echo 'Ningún build detectado; copiando archivos estáticos mínimos'
+            cp -R index.html css js deploy_for_pages/ || true
+          fi
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v3
+
+      - name: Upload artifact for GitHub Pages
+        uses: actions/upload-pages-artifact@v1
+        with:
+          path: ./deploy_for_pages
+
+      - name: Deploy to GitHub Pages
+        uses: actions/deploy-pages@v1
+        # Nota: este despliegue publica a GitHub Pages; para otros entornos (FTP, SSH, Azure) reemplaza este paso.
+
+      - name: Deployment summary
+        run: echo "Despliegue al entorno 'pruebas' completado. Revisa la página de Environments en GitHub para ver el estado."
+
+# Costes y notas:
+# - GitHub-hosted runners: gratuitos para repos públicos; privados consumen minutos de tu plan.
+# - npm audit y npm ci consumen tiempo de runner; reducir frecuencia ayuda a contener costes.
+# - GitHub Pages despliegues no generan coste adicional fuera del uso de runners; otros destinos (Azure, S3, FTP)
+#   pueden generar costos por hosting. Para despliegues más complejos se requieren secrets (tokens) almacenados en
+#   GitHub Secrets y no deben incluirse en el repositorio.

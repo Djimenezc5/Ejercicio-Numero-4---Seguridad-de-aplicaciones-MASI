@@ -1,5 +1,9 @@
 name: 'GitHub CI/CD - Tests · Audit · Build · Deploy'
 
+# Dar permiso de escritura en el contenido para que GITHUB_TOKEN pueda hacer push a gh-pages
+permissions:
+  contents: write
+
 # Workflow de CI/CD para GitHub Actions
 # Tareas:
 #  - Pruebas automatizadas (Jest)

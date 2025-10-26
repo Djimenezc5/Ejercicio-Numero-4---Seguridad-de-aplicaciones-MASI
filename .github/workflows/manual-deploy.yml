@@ -1,4 +1,9 @@
+
 name: 'Manual Build & Publish to GitHub Pages'
+
+# Dar permiso de escritura en el contenido para que GITHUB_TOKEN pueda hacer push a gh-pages
+permissions:
+  contents: write
 
 # Workflow manual para construir y publicar en GitHub Pages
 # Uso: desde la pestaña Actions -> Manual Build & Publish -> Run workflow
